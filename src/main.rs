@@ -195,7 +195,7 @@ fn main() -> Result<(), Error> {
             // Datetime required for timestamp with time zone
             let import_tz: DateTime<Utc>    = row.get(2);
 
-            println!("inerted: memo = {}, import_ts = {}, import_tz = {}",
+            println!("memo = {}, import_ts = {}, import_tz = {}",
                 memo, 
                 import_ts.format("%m/%d/%Y %T"),
                 import_tz.format("%m/%d/%Y %T"));
