@@ -9,8 +9,11 @@ use postgres::{error::Error, Client, NoTls};
 ////// opt ///////////
 
 #[derive(Debug, StructOpt, Clone)]
-#[structopt(name = "example", about = "An example of StructOpt usage.")]
+#[structopt(name = "systime", about = "Experiments with system and db timestamps.")]
 pub struct Opt {
+    /// The 3 state test level bitmap in decimal.
+    #[structopt(name="LEVEL", default_value="1")]
+    pub level: u16,
     /// Set config-file.
     #[structopt(short = "f", long = "config-file")]
     pub config_file: Option<String>,
@@ -109,71 +112,103 @@ pub struct Postgresql {
     pub database: String,
 }
 
+
+// create.sql
+// DROP TABLE IF EXISTS foo;
+// CREATE TABLE foo (
+//     memo varchar,
+//     import_ts timestamp default now(),
+//     import_tz timestamp with time zone default now()
+// );
+// insert into foo(memo) values('Theo is sneezy but great!');
+
 fn main() -> Result<(), Error> {
     let cfg = Config::new();
-    println!("cfg = {:?}, config_path={}", cfg, cfg.config_path.display());
+    let level = cfg.opt.level;
+    println!("level = {}", level);
 
     //////////////////////
-    let query = "select memo 
-                    from foo";
 
-    let mut client =
-        match connect_db(&cfg) {
-            Ok(clnt) => clnt,
-            Err(_) => panic!("no connect"),
-        };
+    if level & 0b00001 > 0 {
+        let query = "select memo, 
+                            import_ts, 
+                            import_tz
+                        from foo";
 
-    let rows = client.query(query, &[])?;
-    for row in rows.iter() {
-        let memo: String = row.get(0);
-        println!("memo = {}", memo);
+        let mut client =
+            match connect_db(&cfg) {
+                Ok(clnt) => clnt,
+                Err(_) => panic!("no connect"),
+            };
+
+        let rows = client.query(query, &[])?;
+        for row in rows.iter() {
+            let memo: String = row.get(0);
+            // Systime required for timestamp ( without time zone )
+            let import_ts: SystemTime       = row.get(1);
+            let import_ts: DateTime<Utc>    = import_ts.into();
+            // Datetime required for timestamp with time zone
+            let import_tz: DateTime<Utc>    = row.get(2);
+
+            println!("memo = {}, import_ts = {}, import_tz = {}",
+                memo, 
+                import_ts.format("%m/%d/%Y %T"),
+                import_tz.format("%m/%d/%Y %T"));
+        }
     }
 
-
     //////////////////////
 
-    let system_time = SystemTime::now();
-    let datetime: DateTime<Utc> = system_time.into();
-    println!("Current now() from SystemTime= {}",
-                datetime.format("%m/%d/%Y %T"));
+    if level & 0b00010 > 0 {
+        println!("cfg = {:?}, config_path={}", cfg, cfg.config_path.display());
+    }
 
-    // take round trip from an arbitrary datetime to systemtime and back.
-    //let datetime =
-        DateTime::parse_from_rfc3339(
-                "1996-12-19T16:39:57-00:00")
-            .unwrap();
+    if level & 0b00100 > 0 {
+        //////////////////////
 
-    let datetime =
-        match DateTime::parse_from_str(
-                "961219163957+0000", "%y%m%d%H%M%S%z") {
-            Ok(dt) => dt,
-            Err(e) => 
-                panic!("error parsing datetime e={}", e),
-        };
-    println!("1: Arbitrary Datetime = {}", datetime.format("%m/%d/%Y %T"));
+        let system_time = SystemTime::now();
+        let datetime: DateTime<Utc> = system_time.into();
+        println!("Current now() from SystemTime= {}",
+                    datetime.format("%m/%d/%Y %T"));
 
-    let back_to_systime: SystemTime = SystemTime::from(datetime);
-    let back_to_datetime: DateTime<Utc> = back_to_systime.into();
-    println!("1: back_to_datetime from systemtime = {}", 
-        back_to_datetime.format("%m/%d/%Y %T"));
+        // take round trip from an arbitrary datetime to systemtime and back.
+        //let datetime =
+            DateTime::parse_from_rfc3339(
+                    "1996-12-19T16:39:57-00:00")
+                .unwrap();
+
+        let datetime =
+            match DateTime::parse_from_str(
+                    "961219163957+0000", "%y%m%d%H%M%S%z") {
+                Ok(dt) => dt,
+                Err(e) => 
+                    panic!("error parsing datetime e={}", e),
+            };
+        println!("1: Arbitrary Datetime = {}", datetime.format("%m/%d/%Y %T"));
+
+        let back_to_systime: SystemTime = SystemTime::from(datetime);
+        let back_to_datetime: DateTime<Utc> = back_to_systime.into();
+        println!("1: back_to_datetime from systemtime = {}", 
+            back_to_datetime.format("%m/%d/%Y %T"));
 
 
-    let datetime =
-        match DateTime::parse_from_str("2018-01-26T18:30:09.453Z", "%+") {
-            Ok(dt) => dt,
-            Err(e) => 
-                panic!("error parsing datetime e={}", e),
-        };
-    println!("2: Arbitrary Datetime = {}", datetime.format("%m/%d/%Y %T"));
+        let datetime =
+            match DateTime::parse_from_str("2018-01-26T18:30:09.453Z", "%+") {
+                Ok(dt) => dt,
+                Err(e) => 
+                    panic!("error parsing datetime e={}", e),
+            };
+        println!("2: Arbitrary Datetime = {}", datetime.format("%m/%d/%Y %T"));
 
-    let back_to_systime: SystemTime = SystemTime::from(datetime);
-    let back_to_datetime: DateTime<Utc> = back_to_systime.into();
-    println!("2: back_to_datetime from systemtime = {}", 
-        back_to_datetime.format("%m/%d/%Y %T"));
-    println!("3: back_to_datetime from systemtime = {}", 
-        back_to_datetime.format("%+"));
-    println!("4: back_to_datetime from systemtime = {}", 
-        back_to_datetime.format("%Y-%m-%dT%H:%M:%S%.f%:z"));
+        let back_to_systime: SystemTime = SystemTime::from(datetime);
+        let back_to_datetime: DateTime<Utc> = back_to_systime.into();
+        println!("2: back_to_datetime from systemtime = {}", 
+            back_to_datetime.format("%m/%d/%Y %T"));
+        println!("3: back_to_datetime from systemtime = {}", 
+            back_to_datetime.format("%+"));
+        println!("4: back_to_datetime from systemtime = {}", 
+            back_to_datetime.format("%Y-%m-%dT%H:%M:%S%.f%:z"));
+    }
 
     Ok(())
 }
