@@ -127,6 +127,51 @@ fn main() -> Result<(), Error> {
     let level = cfg.opt.level;
     println!("level = {}", level);
 
+    if level & 0b00001 > 0 {
+        let query = "insert into foo(memo, import_ts, import_tz)
+                        values($1, $2, $3)
+                        returning memo, import_ts, import_tz";
+
+        let memo: String = "Theo is cute".into();
+        let import_tz =
+            match DateTime::parse_from_str(
+                    "961219163957+0000", "%y%m%d%H%M%S%z") {
+                Ok(dt) => dt,
+                Err(e) => 
+                    panic!("error parsing datetime e={}", e),
+            };
+        let import_ts =
+            match DateTime::parse_from_str(
+                    "210723120000+0000", "%y%m%d%H%M%S%z") {
+                Ok(dt) => dt,
+                Err(e) => 
+                    panic!("error parsing datetime e={}", e),
+            };
+        let import_ts: SystemTime = import_ts.into();
+
+        let mut client =
+            match connect_db(&cfg) {
+                Ok(clnt) => clnt,
+                Err(_) => panic!("no connect"),
+            };
+
+        let rows = client.query(query, &[&memo, &import_ts, &import_tz])?;
+        for row in rows.iter() {
+            let memo: String = row.get(0);
+            // Systime required for timestamp ( without time zone )
+            let import_ts: SystemTime       = row.get(1);
+            let import_ts: DateTime<Utc>    = import_ts.into();
+            // Datetime required for timestamp with time zone
+            let import_tz: DateTime<Utc>    = row.get(2);
+
+            println!("inserted: memo = {}, import_ts = {}, import_tz = {}",
+                memo, 
+                import_ts.format("%m/%d/%Y %T"),
+                import_tz.format("%m/%d/%Y %T"));
+        }
+    }
+
+
     //////////////////////
 
     if level & 0b00001 > 0 {
@@ -150,7 +195,7 @@ fn main() -> Result<(), Error> {
             // Datetime required for timestamp with time zone
             let import_tz: DateTime<Utc>    = row.get(2);
 
-            println!("memo = {}, import_ts = {}, import_tz = {}",
+            println!("inerted: memo = {}, import_ts = {}, import_tz = {}",
                 memo, 
                 import_ts.format("%m/%d/%Y %T"),
                 import_tz.format("%m/%d/%Y %T"));
