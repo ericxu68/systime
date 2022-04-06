@@ -253,6 +253,25 @@ fn main() -> Result<(), Error> {
             back_to_datetime.format("%+"));
         println!("4: back_to_datetime from systemtime = {}", 
             back_to_datetime.format("%Y-%m-%dT%H:%M:%S%.f%:z"));
+
+
+        let datetime =
+            match DateTime::parse_from_str("2021-01-01T05:00:00.003Z", "%+") {
+                Ok(dt) => dt,
+                Err(e) => 
+                    panic!("error parsing datetime e={}", e),
+            };
+        println!("2: Arbitrary Datetime = {}", datetime.format("%m/%d/%Y %T"));
+
+        let back_to_systime: SystemTime = SystemTime::from(datetime);
+        let back_to_datetime: DateTime<Utc> = back_to_systime.into();
+        println!("2: back_to_datetime from systemtime = {}", 
+            back_to_datetime.format("%m/%d/%Y %T"));
+        println!("3: back_to_datetime from systemtime = {}", 
+            back_to_datetime.format("%+"));
+        println!("4: back_to_datetime from systemtime = {}", 
+            back_to_datetime.format("%Y-%m-%dT%H:%M:%S%.f%:z"));
+
     }
 
     Ok(())
